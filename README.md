@@ -7,6 +7,7 @@
 - 命格分析 Prompt 组装（生辰解读 / 十神格局 / 五行喜忌）
 - 大运详情 Prompt 组装
 - 对话上下文组装（八字、完整大运、命格分析结果、当前时序信息）
+- 根据用户提供的出生年月日时自动排八字并生成大运
 - 用户问题自动分流：泛化分析输出完整报告，具体问题带 `/chat` 上下文回答
 - 命格分析结果解析（含结构化五行喜忌提取）
 - 通过 OpenClaw / OpenAI SDK 兼容接口调用用户运行环境中的大模型
@@ -22,7 +23,10 @@ pip install -r requirements.txt
 如果运行环境已经注入 OpenClaw/OpenAI 兼容变量，可直接运行示例；否则先复制 `.env.example` 为 `.env` 并填写本地变量：
 
 ```bash
-# 仅在运行环境未注入模型变量时需要
+# 运行环境已注入模型变量时
+python example_cli.py
+
+# 运行环境未注入模型变量时，先复制并填写 .env
 cp .env.example .env
 
 # 配置完成后运行示例
@@ -46,9 +50,11 @@ python example_cli.py
 
 优先使用 `BaziAnalysisSkill.analyze_user_request()` 处理用户入口：
 
+- 用户提供出生年月日时后，Skill 会通过仓库内排盘代码自动生成 `bazi_data`、`complete_dayun` 和 `dayun_list`。
+- 如果用户没有提供出生年月日时，会先提示用户补充出生年月日时，再进行分析。
 - 用户只说“帮我分析这个生辰八字”“帮我分析”等，没有限定具体方向时，会生成一份完整报告，包含命格分析、当前三步大运详解、五行喜忌与转运建议。
 - 用户问事业、财运、感情、某年运势等具体问题时，会带上 `build_chat_context_string()` 组装的 `/chat` 上下文，只围绕该问题回答。
-- `dayun_list` 应由调用侧传入当前三步大运，报告 prompt 直接复用该列表，不会再从完整大运中重新推断。
+- 调用侧已经有结构化排盘结果时，也可以继续直接传入 `bazi_data`、`complete_dayun` 和 `dayun_list`。
 
 ## 与私有网页仓同步
 

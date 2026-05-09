@@ -3,10 +3,16 @@ from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from bazi_simple import bazi_dayun
 from prompt_config import CHAT_SYSTEM_PROMPT, LLM_CONFIG, PROMPT_TEMPLATES, SYSTEM_PROMPTS
 
 
 class BaziAnalysisSkill:
+    MISSING_BIRTH_INFO_MESSAGE = (
+        "请先提供出生年月日时，这样我才能排出八字和大运后再分析。"
+        "你可以按“公历1992年8月9日11时50分，男/女”的格式告诉我；"
+        "如果是农历或闰月，也请一并说明。"
+    )
     GENERAL_ANALYSIS_ACTIONS = ("分析", "看看", "看下", "看一下", "解读", "算算", "测测")
     GENERAL_ANALYSIS_SUBJECTS = ("八字", "生辰", "命盘", "命格", "排盘")
     SPECIFIC_QUESTION_KEYWORDS = (
@@ -50,7 +56,7 @@ class BaziAnalysisSkill:
         self.api_key = api_key or self._first_env("OPENCLAW_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY")
         self.base_url = base_url or self._first_env("OPENCLAW_BASE_URL", "OPENAI_BASE_URL", "LLM_BASE_URL")
         self.model = model or self._first_env("OPENCLAW_MODEL", "OPENAI_MODEL", "LLM_MODEL") or LLM_CONFIG["model"]
-        self.client = client or self._build_client()
+        self.client = client
 
     @staticmethod
     def _first_env(*names):
@@ -86,6 +92,84 @@ class BaziAnalysisSkill:
             f"性别：{gender}\n"
             f"日主：{bazi_data['ri']['tian_gan']['char']}"
         )
+
+    @classmethod
+    def build_bazi_data_from_zhus(cls, zhus):
+        pillars = ("nian", "yue", "ri", "shi")
+        return {
+            pillar: {
+                "tian_gan": {"char": gan},
+                "di_zhi": {"char": zhi},
+            }
+            for pillar, (gan, zhi) in zip(pillars, zhus)
+        }
+
+    @classmethod
+    def format_dayun_item(cls, dayun):
+        gan_zhi = cls._format_ganzhi(cls._get_dayun_value(dayun, "gan_zhi", "ganzhi"))
+        return {
+            "gan_zhi": gan_zhi,
+            "year": cls._get_dayun_value(dayun, "year", "start_year"),
+            "age": cls._get_dayun_value(dayun, "age", "start_age"),
+            "shishen_gan": cls._get_dayun_value(dayun, "shishen_gan"),
+            "shishen_zhi": cls._get_dayun_value(dayun, "shishen_zhi"),
+            "shensha": cls._get_dayun_value(dayun, "shensha"),
+        }
+
+    @staticmethod
+    def has_birth_datetime(year=None, month=None, day=None, hour=None, birth_datetime=None):
+        if birth_datetime is not None:
+            return True
+        return all(value is not None for value in (year, month, day, hour))
+
+    @staticmethod
+    def is_female_gender(gender):
+        if isinstance(gender, bool):
+            return gender
+        return str(gender or "").strip().lower() in {"女", "女性", "female", "f", "woman"}
+
+    def build_analysis_inputs_from_birth(
+        self,
+        year=None,
+        month=None,
+        day=None,
+        hour=None,
+        minute=0,
+        gender="男",
+        is_lunar=False,
+        leap_month=False,
+        birth_datetime=None,
+        complete_dayun_count=10,
+        dayun_list_count=3,
+    ):
+        if not self.has_birth_datetime(year, month, day, hour, birth_datetime):
+            raise ValueError(self.MISSING_BIRTH_INFO_MESSAGE)
+
+        if birth_datetime is not None:
+            year = birth_datetime.year
+            month = birth_datetime.month
+            day = birth_datetime.day
+            hour = birth_datetime.hour
+            minute = birth_datetime.minute
+
+        calculator = bazi_dayun()
+        calculator.year = int(year)
+        calculator.month = int(month)
+        calculator.day = int(day)
+        calculator.hour = int(hour)
+        calculator.minute = int(minute or 0)
+        calculator.yin = bool(is_lunar)
+        calculator.runyue = bool(leap_month)
+        calculator.female = self.is_female_gender(gender)
+
+        _, zhus = calculator.get_bazi()
+        full_dayun = [self.format_dayun_item(dayun) for dayun in calculator.get_dayun(n=complete_dayun_count + 1)]
+        return {
+            "bazi_data": self.build_bazi_data_from_zhus(zhus),
+            "complete_dayun": full_dayun,
+            "dayun_list": full_dayun[:dayun_list_count],
+            "gender": gender or "男",
+        }
 
     @staticmethod
     def format_complete_dayun(complete_dayun):
@@ -211,6 +295,8 @@ class BaziAnalysisSkill:
     def _chat(self, system_prompt, user_prompt, temperature=None):
         if not self.model:
             raise ValueError("大模型 model 未配置，请设置 OPENCLAW_MODEL、OPENAI_MODEL 或 LLM_MODEL。")
+        if self.client is None:
+            self.client = self._build_client()
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -360,15 +446,52 @@ class BaziAnalysisSkill:
     def analyze_user_request(
         self,
         user_message,
-        bazi_data,
-        gender,
+        bazi_data=None,
+        gender=None,
         dayun_list=None,
         da_yun=None,
         complete_dayun=None,
         mingge_analysis=None,
         current_month_ganzhi=None,
         current_day_ganzhi=None,
+        birth_year=None,
+        birth_month=None,
+        birth_day=None,
+        birth_hour=None,
+        birth_minute=0,
+        birth_datetime=None,
+        is_lunar=False,
+        leap_month=False,
     ):
+        if bazi_data is None:
+            if not self.has_birth_datetime(
+                birth_year,
+                birth_month,
+                birth_day,
+                birth_hour,
+                birth_datetime=birth_datetime,
+            ):
+                return self.MISSING_BIRTH_INFO_MESSAGE
+
+            birth_inputs = self.build_analysis_inputs_from_birth(
+                year=birth_year,
+                month=birth_month,
+                day=birth_day,
+                hour=birth_hour,
+                minute=birth_minute,
+                gender=gender or "男",
+                is_lunar=is_lunar,
+                leap_month=leap_month,
+                birth_datetime=birth_datetime,
+            )
+            bazi_data = birth_inputs["bazi_data"]
+            gender = birth_inputs["gender"]
+            if complete_dayun is None:
+                complete_dayun = birth_inputs["complete_dayun"]
+            if dayun_list is None and da_yun is None:
+                dayun_list = birth_inputs["dayun_list"]
+
+        gender = gender or "未提供"
         active_dayun_list = dayun_list if dayun_list is not None else da_yun
         if self.is_default_report_request(user_message):
             return self.analyze_default_report(
