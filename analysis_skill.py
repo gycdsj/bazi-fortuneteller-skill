@@ -253,13 +253,13 @@ class BaziAnalysisSkill:
         self,
         bazi_info,
         complete_dayun=None,
-        current_three_dayun=None,
+        dayun_list=None,
         mingge_analysis=None,
     ):
         return PROMPT_TEMPLATES["default_report"].format(
             bazi_info=bazi_info,
             complete_dayun=self.format_complete_dayun(complete_dayun),
-            current_dayun=self.format_dayun_window(current_three_dayun),
+            dayun_list=self.format_dayun_window(dayun_list),
             existing_mingge_analysis=self.format_mingge_analysis(mingge_analysis),
         )
 
@@ -333,14 +333,14 @@ class BaziAnalysisSkill:
         reference_year=None,
     ):
         bazi_info = self.build_bazi_info_string(bazi_data, gender)
-        current_three_dayun = da_yun or self.select_current_three_dayun(
+        dayun_list = da_yun or self.select_current_three_dayun(
             complete_dayun,
             reference_year=reference_year,
         )
         prompt = self.build_default_report_prompt(
             bazi_info,
             complete_dayun=complete_dayun,
-            current_three_dayun=current_three_dayun,
+            dayun_list=dayun_list,
             mingge_analysis=mingge_analysis,
         )
         return self._chat(SYSTEM_PROMPTS["default_report"], prompt)

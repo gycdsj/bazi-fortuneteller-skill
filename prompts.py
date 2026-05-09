@@ -38,7 +38,7 @@ def build_bazi_analysis_prompt(bazi_info, analysis_type='bazi_analysis', complet
         return PROMPT_TEMPLATES[analysis_type].format(
             bazi_info=bazi_info,
             complete_dayun=complete_dayun_text,
-            current_dayun="未提供当前三步大运信息。",
+            dayun_list="未提供当前三步大运信息。",
             existing_mingge_analysis="未提供。",
         )
     else:
