@@ -21,6 +21,7 @@ def main():
         bazi_data=bazi_data,
         gender="男",
         complete_dayun=complete_dayun,
+        dayun_list=complete_dayun,
     )
     print(json.dumps({"report": result}, ensure_ascii=False, indent=2))
 

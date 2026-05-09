@@ -97,13 +97,6 @@ class BaziAnalysisSkill:
             return "".join(str(item) for item in value)
         return "" if value is None else str(value)
 
-    @staticmethod
-    def _to_int(value):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
     @classmethod
     def is_default_report_request(cls, user_message):
         """判断用户是否只是在泛化地要求分析八字，而非追问具体事项。"""
@@ -120,35 +113,6 @@ class BaziAnalysisSkill:
             return False
 
         return has_subject or len(normalized) <= 8
-
-    @classmethod
-    def select_current_three_dayun(cls, complete_dayun, reference_year=None):
-        """从完整大运中取当前大运起连续三步；资料不足时尽量补齐三步。"""
-        if not complete_dayun:
-            return []
-
-        dayun_list = list(complete_dayun)
-        current_year = reference_year or datetime.now().year
-        current_index = 0
-        found_year = False
-
-        for index, dayun in enumerate(dayun_list):
-            start_year = cls._to_int(cls._get_dayun_value(dayun, "year", "start_year"))
-            if start_year is None:
-                continue
-            found_year = True
-            if start_year <= current_year:
-                current_index = index
-            else:
-                break
-
-        if not found_year:
-            current_index = 0
-
-        selected = dayun_list[current_index:current_index + 3]
-        if len(selected) < 3 and current_index > 0:
-            selected = dayun_list[max(0, current_index - (3 - len(selected))):current_index] + selected
-        return selected
 
     @classmethod
     def format_dayun_window(cls, dayun_list):
@@ -328,19 +292,16 @@ class BaziAnalysisSkill:
         bazi_data,
         gender,
         complete_dayun=None,
+        dayun_list=None,
         da_yun=None,
         mingge_analysis=None,
-        reference_year=None,
     ):
         bazi_info = self.build_bazi_info_string(bazi_data, gender)
-        dayun_list = da_yun or self.select_current_three_dayun(
-            complete_dayun,
-            reference_year=reference_year,
-        )
+        report_dayun_list = dayun_list if dayun_list is not None else da_yun
         prompt = self.build_default_report_prompt(
             bazi_info,
             complete_dayun=complete_dayun,
-            dayun_list=dayun_list,
+            dayun_list=report_dayun_list,
             mingge_analysis=mingge_analysis,
         )
         return self._chat(SYSTEM_PROMPTS["default_report"], prompt)
@@ -378,28 +339,28 @@ class BaziAnalysisSkill:
         user_message,
         bazi_data,
         gender,
+        dayun_list=None,
         da_yun=None,
         complete_dayun=None,
         mingge_analysis=None,
         current_month_ganzhi=None,
         current_day_ganzhi=None,
-        reference_year=None,
     ):
+        active_dayun_list = dayun_list if dayun_list is not None else da_yun
         if self.is_default_report_request(user_message):
             return self.analyze_default_report(
                 bazi_data=bazi_data,
                 gender=gender,
                 complete_dayun=complete_dayun,
-                da_yun=da_yun,
+                dayun_list=active_dayun_list,
                 mingge_analysis=mingge_analysis,
-                reference_year=reference_year,
             )
 
         return self.answer_chat_question(
             user_message=user_message,
             bazi_data=bazi_data,
             gender=gender,
-            da_yun=da_yun,
+            da_yun=active_dayun_list,
             complete_dayun=complete_dayun,
             mingge_analysis=mingge_analysis,
             current_month_ganzhi=current_month_ganzhi,
