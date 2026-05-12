@@ -324,7 +324,7 @@ class BaziAnalysisSkill:
         if any(keyword in normalized for keyword in cls.SPECIFIC_QUESTION_KEYWORDS):
             return False
 
-        return has_subject or len(normalized) <= 8
+        return has_subject or has_action
 
     @classmethod
     def format_dayun_window(cls, dayun_list):
