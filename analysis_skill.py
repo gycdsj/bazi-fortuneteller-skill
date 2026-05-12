@@ -729,11 +729,19 @@ class BaziAnalysisSkill:
         )
         if temporal_context:
             context = f"{context}\n\n{temporal_context}"
+            temporal_answer_instruction = (
+                "时间问题补充信息只作为内部分析依据。回答时不要在开头机械列出"
+                "“当前大运、流年、流月、流日、目标日期”等清单，也不要先说明按哪一天看；"
+                "可以在解释原因时自然引用少量关键干支或十神，例如“丁亥日让主观性更强”。"
+            )
+        else:
+            temporal_answer_instruction = ""
         prompt = (
             f"{context}\n\n"
             f"用户问题：{user_message}\n\n"
             "请结合以上 /chat 上下文回答用户的具体问题。只围绕问题本身分析，"
             "不要重新输出完整命格报告。"
+            f"{temporal_answer_instruction}"
         )
         return self._chat(CHAT_SYSTEM_PROMPT, prompt)
 
