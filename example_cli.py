@@ -8,10 +8,10 @@ def main():
     result = skill.analyze_user_request(
         user_message="帮我分析这个生辰八字",
         gender="男",
-        birth_year=1992,
-        birth_month=8,
-        birth_day=9,
-        birth_hour=11,
+        birth_year=2026,
+        birth_month=5,
+        birth_day=12,
+        birth_hour=9,
         birth_minute=50,
     )
     print(json.dumps({"report": result}, ensure_ascii=False, indent=2))
