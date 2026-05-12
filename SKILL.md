@@ -1,6 +1,6 @@
 ---
 name: bazi-fortuneteller
-description: Extracts and runs bazi analysis logic (mingge analysis, dayun detail analysis, and chat context building) without any frontend. Use when the user wants backend-only analysis capability from the suibiansuansuan website.
+description: Runs bazi chart generation, dayun analysis, full-report generation, and chat context building for user-facing fortune-telling questions.
 disable-model-invocation: true
 ---
 
