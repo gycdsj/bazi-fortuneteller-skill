@@ -10,7 +10,7 @@
 LLM_CONFIG = {
     'model': '',
     'temperature': 1.0,
-    'timeout': 30,
+    'timeout': 120,
     'stream': False
 }
 
