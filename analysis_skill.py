@@ -258,6 +258,51 @@ class BaziAnalysisSkill:
             "shensha": cls._get_dayun_value(dayun, "shensha"),
         }
 
+    @classmethod
+    def _dayun_start_year(cls, dayun):
+        raw = cls._get_dayun_value(dayun, "year", "start_year")
+        if raw is None or raw == "":
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    @classmethod
+    def pick_dayun_triplet_around_current_year(cls, dayuns, birth_year, current_year=None):
+        """按公历年选取围绕「当前大运」的三步：上一运、当前运、下一运。"""
+        if not dayuns:
+            return []
+        current_year = int(current_year if current_year is not None else datetime.now().year)
+        birth_year = int(birth_year)
+
+        if current_year - birth_year > 100 and len(dayuns) >= 4:
+            return list(dayuns[:3])
+
+        current_dayun_index = -1
+        for i, dayun in enumerate(dayuns):
+            y = cls._dayun_start_year(dayun)
+            if y is None:
+                continue
+            if y <= current_year:
+                current_dayun_index = i
+            else:
+                break
+
+        if current_dayun_index == -1:
+            current_dayun_index = 0
+
+        n = len(dayuns)
+        if n <= 3:
+            return list(dayuns)
+
+        ci = current_dayun_index
+        if ci == 0:
+            return list(dayuns[0:3])
+        if ci >= n - 1:
+            return list(dayuns[n - 3 : n])
+        return list(dayuns[ci - 1 : ci + 2])
+
     @staticmethod
     def has_birth_datetime(year=None, month=None, day=None, hour=None, birth_datetime=None):
         if birth_datetime is not None:
@@ -281,6 +326,7 @@ class BaziAnalysisSkill:
         is_lunar=False,
         leap_month=False,
         birth_datetime=None,
+        reference_datetime=None,
         complete_dayun_count=10,
         dayun_list_count=3,
     ):
@@ -306,10 +352,15 @@ class BaziAnalysisSkill:
 
         _, zhus = calculator.get_bazi()
         full_dayun = [self.format_dayun_item(dayun) for dayun in calculator.get_dayun(n=complete_dayun_count + 1)]
+        ref_year = reference_datetime.year if reference_datetime is not None else None
+        dayun_window = self.pick_dayun_triplet_around_current_year(
+            full_dayun, int(year), current_year=ref_year
+        )
+        dayun_window = dayun_window[:dayun_list_count]
         return {
             "bazi_data": self.build_bazi_data_from_zhus(zhus, calculator=calculator),
             "complete_dayun": full_dayun,
-            "dayun_list": full_dayun[:dayun_list_count],
+            "dayun_list": dayun_window,
             "gender": gender or "男",
         }
 
@@ -786,6 +837,7 @@ class BaziAnalysisSkill:
                 is_lunar=is_lunar,
                 leap_month=leap_month,
                 birth_datetime=birth_datetime,
+                reference_datetime=reference_datetime,
             )
             bazi_data = birth_inputs["bazi_data"]
             gender = birth_inputs["gender"]
