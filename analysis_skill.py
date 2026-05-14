@@ -14,9 +14,45 @@ from prompt_config import CHAT_SYSTEM_PROMPT, LLM_CONFIG, PROMPT_TEMPLATES, SYST
 class BaziAnalysisSkill:
     MISSING_BIRTH_INFO_MESSAGE = (
         "请先提供出生年月日时，这样我才能排出八字和大运后再分析。"
-        "你可以按“公历1992年8月9日11时50分，男/女”的格式告诉我；"
+        "你可以按\u201c公历1992年8月9日11时50分，男/女\u201d的格式告诉我；"
         "如果是农历或闰月，也请一并说明。"
     )
+
+    @staticmethod
+    def _load_openclaw_config():
+        """Fallback: read OpenClaw's own config so the skill auto-uses the same backend."""
+        import json
+        path = os.path.expanduser("~/.openclaw/openclaw.json")
+        try:
+            with open(path) as f:
+                cfg = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None, None, None
+
+        providers = cfg.get("models", {}).get("providers", {})
+        defaults = cfg.get("agents", {}).get("defaults", {})
+        model_cfg = defaults.get("model", {})
+
+        # primary model e.g. "deepseek/deepseek-v4-flash"
+        primary = model_cfg.get("primary", "")
+        if "/" in primary:
+            provider_name, model_id = primary.split("/", 1)
+            provider = providers.get(provider_name, {})
+        else:
+            # fallback: try first available provider
+            provider_name, provider = next(iter(providers.items()), (None, {}))
+            model_id = primary
+
+        api_key = (provider.get("apiKey") or
+                    os.getenv("OPENCLAW_API_KEY") or
+                    os.getenv("OPENAI_API_KEY"))
+        base_url = (provider.get("baseUrl") or
+                    os.getenv("OPENCLAW_BASE_URL") or
+                    os.getenv("OPENAI_BASE_URL"))
+        model = model_id or os.getenv("OPENCLAW_MODEL") or os.getenv("OPENAI_MODEL")
+
+        return api_key, base_url, model
+
     PILLAR_LABELS = {
         "nian": "年柱",
         "yue": "月柱",
@@ -88,9 +124,22 @@ class BaziAnalysisSkill:
 
     def __init__(self, api_key=None, base_url=None, model=None, client=None):
         load_dotenv()
-        self.api_key = api_key or self._first_env("OPENCLAW_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY")
-        self.base_url = base_url or self._first_env("OPENCLAW_BASE_URL", "OPENAI_BASE_URL", "LLM_BASE_URL")
-        self.model = model or self._first_env("OPENCLAW_MODEL", "OPENAI_MODEL", "LLM_MODEL") or LLM_CONFIG["model"]
+        self.api_key = (
+            api_key
+            or self._first_env("OPENCLAW_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY")
+            or self._load_openclaw_config()[0]
+        )
+        self.base_url = (
+            base_url
+            or self._first_env("OPENCLAW_BASE_URL", "OPENAI_BASE_URL", "LLM_BASE_URL")
+            or self._load_openclaw_config()[1]
+        )
+        self.model = (
+            model
+            or self._first_env("OPENCLAW_MODEL", "OPENAI_MODEL", "LLM_MODEL")
+            or self._load_openclaw_config()[2]
+            or LLM_CONFIG["model"]
+        )
         self.client = client
 
     @staticmethod
