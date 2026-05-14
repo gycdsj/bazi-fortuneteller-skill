@@ -1,4 +1,4 @@
-# bazi-fortuneteller-skill
+# bazi-astrology
 
 一个用于八字排盘与命理问答的 Python Skill。输入出生信息和问题，返回适合用户阅读的中文分析。
 

@@ -1,10 +1,10 @@
 ---
-name: bazi-fortuneteller
-description: Runs bazi chart generation, dayun analysis, full-report generation, and chat context building for user-facing fortune-telling questions.
+name: bazi-astrology
+description: Runs bazi chart generation, dayun analysis, full-report generation, and chat context building for user-facing astrology questions.
 disable-model-invocation: true
 ---
 
-# Bazi Fortuneteller Skill
+# Bazi Astrology Skill
 
 ## Instructions
 
